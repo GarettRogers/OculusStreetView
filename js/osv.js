@@ -85,7 +85,7 @@ function initWebGL() {
   scene.add( camera );
 
   // Add projection sphere
-  projSphere = new THREE.Mesh( new THREE.SphereGeometry( 500, 512, 256 ), new THREE.MeshBasicMaterial({ map: THREE.ImageUtils.loadTexture('placeholder.png'), side: THREE.DoubleSide}) );
+  projSphere = new THREE.Mesh( new THREE.SphereGeometry( 500, 512, 256 ), new THREE.MeshBasicMaterial({ map: THREE.ImageUtils.loadTexture('/images/placeholder.png'), side: THREE.DoubleSide}) );
   projSphere.geometry.dynamic = true;
   projSphere.useQuaternion = true;
   scene.add( projSphere );
@@ -648,6 +648,7 @@ function resize( event ) {
 function loop() {
   requestAnimationFrame( loop );
 
+  /*
   // User vr plugin
   if (!USE_TRACKER && VRState !== null) {
     if (vr.pollState(VRState)) {
@@ -673,7 +674,7 @@ function loop() {
   // Compute heading
   headingVector.setEulerFromQuaternion(camera.quaternion, 'YZX');
   currHeading = angleRangeDeg(THREE.Math.radToDeg(-headingVector.y));
-
+*/
   // render
   render();
 }
@@ -717,7 +718,52 @@ $(document).ready(function() {
       }
     }
   });
+
   setUiSize();
+
+var cupola = new Cupola({
+    "onConnect" : function() {
+        console.log("Rift is connected");
+
+    },
+    "onDisconnect" : function() {
+        console.log("Rift is disconnected");
+    },
+    "onConfigUpdate" : function(config) {
+        console.log("Received new config", config);
+        console.log("Field of view: " + config.FOV);
+    },
+    "onOrientationUpdate" : function(quatValues) {
+		var quat = new THREE.Quaternion();
+		var quatCam = new THREE.Quaternion();
+		var xzVector = new THREE.Vector3(0, 0, 1);
+        var values = [quatValues.x, quatValues.y, quatValues.z, quatValues.w];
+        console.log("Orientation: " + values.join(", "));
+		
+		quat.setFromAxisAngle(bodyAxis, bodyAngle);
+
+		// make a quaternion for the current orientation of the Rift
+		//var quatCam = new THREE.Quaternion(quatValues.x, quatValues.y, quatValues.z, quatValues.w);
+		quatCam.set(quatValues.x, quatValues.y, quatValues.z, quatValues.w);
+
+		// multiply the body rotation by the Rift rotation.
+		quat.multiply(quatCam);
+
+
+		// Make a vector pointing along the Z axis and rotate it accoring to the combined look/body angle.
+		//var xzVector = new THREE.Vector3(0, 0, 1);
+		xzVector.set(0,0,1);
+		xzVector.applyQuaternion(quat);
+
+		// Compute the X/Z angle based on the combined look/body angle.  This will be used for FPS style movement controls
+		// so you can steer with a combination of the keyboard and by moving your head.
+		viewAngle = Math.atan2(xzVector.z, xzVector.x) + Math.PI;
+
+		// Apply the combined look/body angle to the camera.
+		camera.quaternion.copy(quat);
+    },
+});
+cupola.connect();
 
   initWebGL();
   initControls();
